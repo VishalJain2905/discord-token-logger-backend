@@ -166,7 +166,6 @@ app.use(cors({
     'http://localhost:3000',
     'http://localhost:5000',
     'https://discord-token-logger-frontend.vercel.app',
-    'https://bookmarklett.vercel.app',
   ],
   credentials: true,
 }));
